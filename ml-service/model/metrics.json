@@ -1,0 +1,34 @@
+{
+  "dataset_rows": 30000,
+  "test_rows": 6000,
+  "threshold": 0.5,
+  "logistic_regression": {
+    "auc": 0.7067,
+    "accuracy": 0.808,
+    "precision": 0.6866,
+    "recall": 0.2427,
+    "f1": 0.3586
+  },
+  "xgboost": {
+    "auc": 0.7778,
+    "accuracy": 0.8185,
+    "precision": 0.6648,
+    "recall": 0.3617,
+    "f1": 0.4685
+  },
+  "fairness_by_sex": {
+    "male": {
+      "count": 2402,
+      "actual_default_rate": 0.2336,
+      "approval_rate": 0.8739,
+      "auc": 0.7748
+    },
+    "female": {
+      "count": 3598,
+      "actual_default_rate": 0.2129,
+      "approval_rate": 0.8835,
+      "auc": 0.7791
+    },
+    "approval_rate_difference": 0.0096
+  }
+}

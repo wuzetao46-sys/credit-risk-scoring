@@ -1,0 +1,99 @@
+body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    margin: 0;
+    background: #f4f6f8;
+    color: #1f2933;
+}
+
+header {
+    background: #1f3a5f;
+    color: white;
+    padding: 24px 32px;
+}
+
+header h1 { margin: 0 0 4px; }
+header p { margin: 0; opacity: 0.85; }
+
+main {
+    max-width: 1000px;
+    margin: 24px auto;
+    padding: 0 16px;
+}
+
+.card {
+    background: white;
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+fieldset {
+    border: 1px solid #d9e2ec;
+    border-radius: 6px;
+    margin-bottom: 16px;
+    overflow-x: auto;
+}
+
+label {
+    display: inline-flex;
+    flex-direction: column;
+    margin: 6px 12px 6px 0;
+    font-size: 14px;
+}
+
+input, select {
+    padding: 6px;
+    border: 1px solid #bcccdc;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+#monthly-table input { width: 90px; }
+
+table { border-collapse: collapse; width: 100%; }
+th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #e4e7eb; font-size: 14px; }
+
+button {
+    padding: 6px 12px;
+    border: 1px solid #bcccdc;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button.primary {
+    background: #1f3a5f;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+}
+
+.examples { margin-bottom: 12px; font-size: 14px; }
+.hint { color: #616e7c; font-size: 13px; }
+.probability { font-size: 20px; }
+
+.badge { padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 14px; }
+.badge.approve { background: #e3f9e5; color: #1f7a33; }
+.badge.manual_review { background: #fff3c4; color: #8d6708; }
+.badge.decline { background: #ffe3e3; color: #b42318; }
+
+.factor {
+    display: grid;
+    grid-template-columns: 280px 1fr 60px;
+    align-items: center;
+    gap: 10px;
+    margin: 6px 0;
+    font-size: 14px;
+}
+
+.bar-track { background: #f0f4f8; height: 14px; border-radius: 7px; }
+.bar { display: block; height: 100%; border-radius: 7px; }
+.bar.up { background: #e5484d; }
+.bar.down { background: #30a46c; }
+.factor-impact { text-align: right; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 640px) {
+    .factor { grid-template-columns: 1fr; }
+}

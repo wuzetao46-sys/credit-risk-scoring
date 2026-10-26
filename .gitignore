@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+.venv/
+.pytest_cache/
+ml-service/data/
+
+# Java
+backend/target/
+backend/data/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+.DS_Store
