@@ -5,9 +5,10 @@ Run:  uvicorn app:app --port 8000
 Docs: http://localhost:8000/docs   (try the API in your browser)
 
 Endpoints:
-  GET  /health    is the service up and the model loaded?
+  GET  /health    is the service up?
+  GET  /options   allowed values for the drop-down fields (purpose, state, ...)
   GET  /metrics   evaluation results produced by train.py
-  POST /predict   score one applicant and explain the score
+  POST /predict   score one loan application, explain it and suggest a price
 """
 import json
 from pathlib import Path
@@ -17,56 +18,55 @@ import xgboost as xgb
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from features import FEATURE_LABELS, FEATURES
+import economics
+from data import load_categories, to_model_input
+from features import CATEGORICAL_FEATURES, FEATURE_LABELS, FEATURES, TARGET_MARGIN
 
 MODEL_DIR = Path(__file__).parent / "model"
-
-# Decision rule: probability of default -> recommendation for the loan officer.
-APPROVE_BELOW = 0.30
-DECLINE_FROM = 0.50
 
 app = FastAPI(title="Credit Risk Model Service")
 
 model = xgb.XGBClassifier()
 model.load_model(MODEL_DIR / "xgboost_model.json")
+categories = load_categories(MODEL_DIR / "categories.json")
+metrics_data = json.loads((MODEL_DIR / "metrics.json").read_text())
+
+# Decision rule: below the profit-optimal threshold -> approve; a band of 10 points
+# above it -> a loan officer looks at it; anything riskier -> decline.
+APPROVE_BELOW = metrics_data["approval_threshold"]
+DECLINE_FROM = APPROVE_BELOW + 0.10
 
 
-class Applicant(BaseModel):
-    """One credit card customer. Field names match the UCI dataset columns."""
-    LIMIT_BAL: float = Field(gt=0)
-    EDUCATION: int = Field(ge=1, le=4)
-    MARRIAGE: int = Field(ge=1, le=3)
-    AGE: int = Field(ge=18, le=100)
-    PAY_0: int = Field(ge=-2, le=9)
-    PAY_2: int = Field(ge=-2, le=9)
-    PAY_3: int = Field(ge=-2, le=9)
-    PAY_4: int = Field(ge=-2, le=9)
-    PAY_5: int = Field(ge=-2, le=9)
-    PAY_6: int = Field(ge=-2, le=9)
-    BILL_AMT1: float
-    BILL_AMT2: float
-    BILL_AMT3: float
-    BILL_AMT4: float
-    BILL_AMT5: float
-    BILL_AMT6: float
-    PAY_AMT1: float = Field(ge=0)
-    PAY_AMT2: float = Field(ge=0)
-    PAY_AMT3: float = Field(ge=0)
-    PAY_AMT4: float = Field(ge=0)
-    PAY_AMT5: float = Field(ge=0)
-    PAY_AMT6: float = Field(ge=0)
+class LoanApplication(BaseModel):
+    """One loan application. Field names match the dataset columns."""
+    loan_amnt: float = Field(gt=0, le=100000)
+    term_months: int = Field(description="36 or 60")
+    emp_length: float = Field(ge=0, le=10)
+    annual_inc: float = Field(gt=0)
+    dti: float = Field(ge=0, le=100)
+    delinq_2yrs: int = Field(ge=0, le=50)
+    revol_util: float = Field(ge=0, le=200)
+    total_acc: int = Field(ge=0, le=200)
+    longest_credit_length: float = Field(ge=0, le=80)
+    home_ownership: str
+    purpose: str
+    verification_status: str
+    addr_state: str
 
 
 class Factor(BaseModel):
     feature: str
     label: str
-    value: float
+    value: str
     impact: float  # SHAP value: > 0 pushes risk up, < 0 pushes risk down
 
 
 class Prediction(BaseModel):
     probability_of_default: float
     decision: str
+    expected_loss: float           # USD, PD x LGD x amount
+    break_even_rate: float         # % interest at which expected profit is zero
+    suggested_interest_rate: float | None  # break-even plus the target margin; None if declined
     top_factors: list[Factor]
 
 
@@ -78,38 +78,55 @@ def decide(probability: float) -> str:
     return "DECLINE"
 
 
+def check_categories(application: LoanApplication) -> None:
+    if application.term_months not in (36, 60):
+        raise HTTPException(422, "term_months must be 36 or 60")
+    for column in CATEGORICAL_FEATURES:
+        value = getattr(application, column)
+        if value not in categories[column]:
+            raise HTTPException(422, f"{column} must be one of {categories[column]}")
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 
+@app.get("/options")
+def options():
+    return categories
+
+
 @app.get("/metrics")
 def metrics():
-    metrics_file = MODEL_DIR / "metrics.json"
-    if not metrics_file.exists():
-        raise HTTPException(404, "Run train.py first")
-    return json.loads(metrics_file.read_text())
+    return metrics_data
 
 
 @app.post("/predict", response_model=Prediction)
-def predict(applicant: Applicant):
-    row = pd.DataFrame([applicant.model_dump()])[FEATURES]
+def predict(application: LoanApplication):
+    check_categories(application)
+    row = to_model_input(pd.DataFrame([application.model_dump()]), categories)
     probability = float(model.predict_proba(row)[0, 1])
 
-    # SHAP values from XGBoost's built-in TreeSHAP. The last column is the
-    # base value (average prediction), so we drop it. Values are in log-odds.
+    # SHAP values from XGBoost's built-in TreeSHAP, one per input feature.
+    # The last column is the base value (average prediction), so we drop it. Values are in log-odds.
     contributions = model.get_booster().predict(
-        xgb.DMatrix(row), pred_contribs=True)[0][:-1]
+        xgb.DMatrix(row, enable_categorical=True), pred_contribs=True)[0][:-1]
 
     factors = [
         Factor(feature=name, label=FEATURE_LABELS[name],
-               value=float(row.iloc[0][name]), impact=round(float(impact), 4))
+               value=str(getattr(application, name)), impact=round(float(impact), 4))
         for name, impact in zip(FEATURES, contributions)
     ]
     factors.sort(key=lambda f: abs(f.impact), reverse=True)
 
+    break_even = economics.break_even_rate(probability, application.term_months)
+    decision = decide(probability)
     return Prediction(
         probability_of_default=round(probability, 4),
-        decision=decide(probability),
+        decision=decision,
+        expected_loss=round(float(economics.expected_loss(probability, application.loan_amnt)), 2),
+        break_even_rate=round(break_even, 2),
+        suggested_interest_rate=None if decision == "DECLINE" else round(break_even + TARGET_MARGIN * 100, 2),
         top_factors=factors[:5],
     )

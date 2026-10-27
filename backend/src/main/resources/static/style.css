@@ -49,7 +49,6 @@ input, select {
     font-size: 14px;
 }
 
-#monthly-table input { width: 90px; }
 
 table { border-collapse: collapse; width: 100%; }
 th, td { padding: 6px 8px; text-align: left; border-bottom: 1px solid #e4e7eb; font-size: 14px; }
@@ -72,7 +71,17 @@ button.primary {
 
 .examples { margin-bottom: 12px; font-size: 14px; }
 .hint { color: #616e7c; font-size: 13px; }
-.probability { font-size: 20px; }
+.result-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.result-grid > div { background: #f4f6f8; border-radius: 6px; padding: 12px; }
+.result-grid strong { font-size: 22px; }
+.caption { display: block; color: #616e7c; font-size: 13px; margin-bottom: 4px; }
+h3 { margin-top: 20px; }
 
 .badge { padding: 3px 10px; border-radius: 12px; font-weight: 600; font-size: 14px; }
 .badge.approve { background: #e3f9e5; color: #1f7a33; }

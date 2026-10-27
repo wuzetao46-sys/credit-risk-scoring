@@ -1,34 +1,148 @@
 {
-  "dataset_rows": 30000,
-  "test_rows": 6000,
-  "threshold": 0.5,
+  "dataset": "Lending Club personal loans (USA)",
+  "dataset_rows": 163983,
+  "test_rows": 32797,
+  "assumptions": {
+    "loss_given_default": 0.7
+  },
+  "approval_threshold": 0.39,
   "logistic_regression": {
-    "auc": 0.7067,
-    "accuracy": 0.808,
-    "precision": 0.6866,
-    "recall": 0.2427,
-    "f1": 0.3586
+    "auc": 0.6747,
+    "accuracy": 0.8168,
+    "precision": 0.486,
+    "recall": 0.0173,
+    "f1": 0.0335
   },
   "xgboost": {
-    "auc": 0.7778,
-    "accuracy": 0.8185,
-    "precision": 0.6648,
-    "recall": 0.3617,
-    "f1": 0.4685
+    "auc": 0.6836,
+    "accuracy": 0.8162,
+    "precision": 0.4729,
+    "recall": 0.0378,
+    "f1": 0.07
   },
-  "fairness_by_sex": {
-    "male": {
-      "count": 2402,
-      "actual_default_rate": 0.2336,
-      "approval_rate": 0.8739,
-      "auc": 0.7748
+  "xgboost_at_approval_threshold": {
+    "auc": 0.6836,
+    "accuracy": 0.8094,
+    "precision": 0.4329,
+    "recall": 0.1338,
+    "f1": 0.2044
+  },
+  "profit_comparison": [
+    {
+      "strategy": "Approve everyone",
+      "approval_rate": 1.0,
+      "default_rate_of_approved": 0.183,
+      "total_profit_usd": 27661691
     },
-    "female": {
-      "count": 3598,
-      "actual_default_rate": 0.2129,
-      "approval_rate": 0.8835,
-      "auc": 0.7791
+    {
+      "strategy": "Model, threshold 0.50",
+      "approval_rate": 0.9854,
+      "default_rate_of_approved": 0.1787,
+      "total_profit_usd": 28284951
     },
-    "approval_rate_difference": 0.0096
+    {
+      "strategy": "Model, profit-optimal threshold 0.39",
+      "approval_rate": 0.9434,
+      "default_rate_of_approved": 0.1681,
+      "total_profit_usd": 29336067
+    }
+  ],
+  "pricing_check": [
+    {
+      "interest_rate_band": "<8%",
+      "loans": 4444,
+      "actual_default_rate": 0.0527,
+      "mean_predicted_pd": 0.1042,
+      "share_underpriced": 0.2462
+    },
+    {
+      "interest_rate_band": "8-11%",
+      "loans": 5005,
+      "actual_default_rate": 0.1063,
+      "mean_predicted_pd": 0.1375,
+      "share_underpriced": 0.2302
+    },
+    {
+      "interest_rate_band": "11-14%",
+      "loans": 8623,
+      "actual_default_rate": 0.149,
+      "mean_predicted_pd": 0.165,
+      "share_underpriced": 0.1971
+    },
+    {
+      "interest_rate_band": "14-17%",
+      "loans": 7417,
+      "actual_default_rate": 0.2183,
+      "mean_predicted_pd": 0.2005,
+      "share_underpriced": 0.1861
+    },
+    {
+      "interest_rate_band": "17-20%",
+      "loans": 4624,
+      "actual_default_rate": 0.2915,
+      "mean_predicted_pd": 0.2361,
+      "share_underpriced": 0.1912
+    },
+    {
+      "interest_rate_band": ">=20%",
+      "loans": 2684,
+      "actual_default_rate": 0.367,
+      "mean_predicted_pd": 0.2964,
+      "share_underpriced": 0.1751
+    }
+  ],
+  "group_analysis": {
+    "home_ownership": [
+      {
+        "group": "MORTGAGE",
+        "loans": 16004,
+        "actual_default_rate": 0.1624,
+        "approval_rate": 0.9567
+      },
+      {
+        "group": "OTHER",
+        "loans": 43,
+        "actual_default_rate": 0.2093,
+        "approval_rate": 0.9535
+      },
+      {
+        "group": "OWN",
+        "loans": 2742,
+        "actual_default_rate": 0.1915,
+        "approval_rate": 0.9384
+      },
+      {
+        "group": "RENT",
+        "loans": 14008,
+        "actual_default_rate": 0.2049,
+        "approval_rate": 0.9293
+      }
+    ],
+    "income_band": [
+      {
+        "group": "Q1 (lowest)",
+        "loans": 8846,
+        "actual_default_rate": 0.2265,
+        "approval_rate": 0.9063
+      },
+      {
+        "group": "Q2",
+        "loans": 7564,
+        "actual_default_rate": 0.2043,
+        "approval_rate": 0.9266
+      },
+      {
+        "group": "Q3",
+        "loans": 8238,
+        "actual_default_rate": 0.1636,
+        "approval_rate": 0.958
+      },
+      {
+        "group": "Q4 (highest)",
+        "loans": 8149,
+        "actual_default_rate": 0.1357,
+        "approval_rate": 0.9847
+      }
+    ]
   }
 }

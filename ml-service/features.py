@@ -1,49 +1,60 @@
 """
 Shared definitions of the input features.
 
-The UCI "Default of Credit Card Clients" dataset (Taiwan, 2005) has 23
-input columns. We deliberately leave SEX out of the model: it is only used
-afterwards to check whether the model treats groups fairly.
+Dataset: Lending Club personal loans (USA), 163,987 loans, as prepared by H2O.ai.
+Each row is one loan; bad_loan = 1 means the borrower defaulted or the loan was charged off.
+
+The lender's interest rate (int_rate) is NOT a model input: Lending Club set it from
+its own risk grade, so using it would copy their model instead of building ours.
+We use it afterwards for the economic analysis (is the price right for the risk?).
 """
 
-# Columns the model is trained on, in this exact order.
-FEATURES = [
-    "LIMIT_BAL",   # credit limit (NT dollars)
-    "EDUCATION",   # 1=graduate school, 2=university, 3=high school, 4=others
-    "MARRIAGE",    # 1=married, 2=single, 3=others
-    "AGE",
-    "PAY_0", "PAY_2", "PAY_3", "PAY_4", "PAY_5", "PAY_6",  # repayment status, Sep..Apr (-1=paid on time, 1..9=months late)
-    "BILL_AMT1", "BILL_AMT2", "BILL_AMT3", "BILL_AMT4", "BILL_AMT5", "BILL_AMT6",  # bill amounts
-    "PAY_AMT1", "PAY_AMT2", "PAY_AMT3", "PAY_AMT4", "PAY_AMT5", "PAY_AMT6",        # amounts paid
+NUMERIC_FEATURES = [
+    "loan_amnt",              # amount requested (USD)
+    "term_months",            # 36 or 60
+    "emp_length",             # years in current job (0-10)
+    "annual_inc",             # annual income (USD)
+    "dti",                    # debt-to-income ratio (%)
+    "delinq_2yrs",            # number of 30+ day late payments in the last 2 years
+    "revol_util",             # revolving credit utilisation (%)
+    "total_acc",              # number of credit lines ever opened
+    "longest_credit_length",  # years since first credit line
 ]
 
-# Only used for the fairness audit, never as a model input.
-PROTECTED_ATTRIBUTE = "SEX"  # 1=male, 2=female
+CATEGORICAL_FEATURES = [
+    "home_ownership",         # RENT, MORTGAGE, OWN, OTHER
+    "purpose",                # debt_consolidation, credit_card, car, ...
+    "verification_status",    # was the income verified?
+    "addr_state",             # US state
+]
 
-TARGET = "default payment next month"
+FEATURES = NUMERIC_FEATURES + CATEGORICAL_FEATURES
+
+TARGET = "bad_loan"
+INTEREST_RATE = "int_rate"  # used for the economic analysis only
 
 # Human-readable names shown in the web page next to each explanation.
 FEATURE_LABELS = {
-    "LIMIT_BAL": "Credit limit",
-    "EDUCATION": "Education level",
-    "MARRIAGE": "Marital status",
-    "AGE": "Age",
-    "PAY_0": "Repayment status (latest month)",
-    "PAY_2": "Repayment status (2 months ago)",
-    "PAY_3": "Repayment status (3 months ago)",
-    "PAY_4": "Repayment status (4 months ago)",
-    "PAY_5": "Repayment status (5 months ago)",
-    "PAY_6": "Repayment status (6 months ago)",
-    "BILL_AMT1": "Bill amount (latest month)",
-    "BILL_AMT2": "Bill amount (2 months ago)",
-    "BILL_AMT3": "Bill amount (3 months ago)",
-    "BILL_AMT4": "Bill amount (4 months ago)",
-    "BILL_AMT5": "Bill amount (5 months ago)",
-    "BILL_AMT6": "Bill amount (6 months ago)",
-    "PAY_AMT1": "Amount paid (latest month)",
-    "PAY_AMT2": "Amount paid (2 months ago)",
-    "PAY_AMT3": "Amount paid (3 months ago)",
-    "PAY_AMT4": "Amount paid (4 months ago)",
-    "PAY_AMT5": "Amount paid (5 months ago)",
-    "PAY_AMT6": "Amount paid (6 months ago)",
+    "loan_amnt": "Loan amount",
+    "term_months": "Term (months)",
+    "emp_length": "Years in current job",
+    "annual_inc": "Annual income",
+    "dti": "Debt-to-income ratio",
+    "delinq_2yrs": "Late payments (last 2 years)",
+    "revol_util": "Credit card utilisation",
+    "total_acc": "Number of credit lines",
+    "longest_credit_length": "Credit history length",
+    "home_ownership": "Home ownership",
+    "purpose": "Loan purpose",
+    "verification_status": "Income verified",
+    "addr_state": "State",
 }
+
+# --- Economic assumptions (state them in the dissertation) ---
+# Loss given default: share of the loan the lender loses when the borrower defaults.
+LOSS_GIVEN_DEFAULT = 0.70
+# For an amortising loan the average outstanding balance is about half the amount,
+# so total interest earned ~= amount * rate * years * 0.5.
+AVERAGE_BALANCE_FACTOR = 0.5
+# Profit margin added on top of the break-even rate when suggesting a price.
+TARGET_MARGIN = 0.02

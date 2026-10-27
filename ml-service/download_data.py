@@ -1,32 +1,23 @@
 """
-Step 1: download the UCI "Default of Credit Card Clients" dataset.
+Step 1: download the Lending Club loan dataset.
 
 Run:  python download_data.py
-Result: data/default_of_credit_card_clients.xls
+Result: data/lending_club_loans.csv  (about 17 MB, 163,987 loans)
 
-Dataset page (licence CC BY 4.0):
-https://archive.ics.uci.edu/dataset/350/default+of+credit+card+clients
+Source: Lending Club public loan data (USA), cleaned and published by H2O.ai for
+their consumer-loan tutorial: https://github.com/h2oai/app-consumer-loan
 """
-import io
 import urllib.request
-import zipfile
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent / "data"
-TARGET_FILE = DATA_DIR / "default_of_credit_card_clients.xls"
+TARGET_FILE = DATA_DIR / "lending_club_loans.csv"
 
-# Official UCI download (a zip with the .xls inside).
-UCI_ZIP_URL = "https://archive.ics.uci.edu/static/public/350/default+of+credit+card+clients.zip"
-# Fallback: a copy of the same .xls kept on GitHub, used if UCI is unreachable.
-MIRROR_XLS_URL = ("https://raw.githubusercontent.com/wangzongyan/"
-                  "Default-of-credit-card-clients-Data-Project/master/"
-                  "default%20of%20credit%20card%20clients.xls")
-
-
-def download(url: str) -> bytes:
-    print(f"Downloading {url} ...")
-    with urllib.request.urlopen(url, timeout=60) as response:
-        return response.read()
+URLS = [
+    "https://s3.amazonaws.com/h2o-public-test-data/bigdata/laptop/lending-club/loan.csv",
+    # Fallback: the same file in H2O's GitHub repository.
+    "https://raw.githubusercontent.com/h2oai/app-consumer-loan/master/data/loan.csv",
+]
 
 
 def main() -> None:
@@ -35,16 +26,17 @@ def main() -> None:
         print(f"Already downloaded: {TARGET_FILE}")
         return
 
-    try:
-        content = download(UCI_ZIP_URL)
-        with zipfile.ZipFile(io.BytesIO(content)) as archive:
-            xls_name = next(n for n in archive.namelist() if n.endswith(".xls"))
-            TARGET_FILE.write_bytes(archive.read(xls_name))
-    except Exception as error:  # network blocked, file moved, ...
-        print(f"UCI download failed ({error}); trying the GitHub mirror.")
-        TARGET_FILE.write_bytes(download(MIRROR_XLS_URL))
+    for url in URLS:
+        try:
+            print(f"Downloading {url} ...")
+            with urllib.request.urlopen(url, timeout=120) as response:
+                TARGET_FILE.write_bytes(response.read())
+            print(f"Saved {TARGET_FILE} ({TARGET_FILE.stat().st_size // 1024} KB)")
+            return
+        except Exception as error:  # network blocked, file moved, ...
+            print(f"  failed: {error}")
 
-    print(f"Saved {TARGET_FILE} ({TARGET_FILE.stat().st_size // 1024} KB)")
+    raise SystemExit("Could not download the dataset. Check your internet connection and try again.")
 
 
 if __name__ == "__main__":

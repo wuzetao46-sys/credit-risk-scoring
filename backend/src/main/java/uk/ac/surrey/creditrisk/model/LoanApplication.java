@@ -19,13 +19,16 @@ public class LoanApplication {
     private Long id;
 
     private String applicantName;
-    private Double creditLimit;
-    private Integer age;
+    private Double loanAmount;
+    private Double annualIncome;
+    private String purpose;
     private Double probabilityOfDefault;
     private String decision;
+    private Double suggestedInterestRate;
+    private Double expectedLoss;
     private LocalDateTime createdAt;
 
-    /** All 22 model inputs as JSON, so the decision can be audited later. */
+    /** All model inputs as JSON, so the decision can be audited later. */
     @Column(length = 4000)
     private String featuresJson;
 
@@ -37,14 +40,16 @@ public class LoanApplication {
         // required by JPA
     }
 
-    public LoanApplication(String applicantName, Double creditLimit, Integer age,
-                           Double probabilityOfDefault, String decision,
-                           String featuresJson, String explanationJson) {
+    public LoanApplication(String applicantName, Double loanAmount, Double annualIncome, String purpose,
+                           Prediction prediction, String featuresJson, String explanationJson) {
         this.applicantName = applicantName;
-        this.creditLimit = creditLimit;
-        this.age = age;
-        this.probabilityOfDefault = probabilityOfDefault;
-        this.decision = decision;
+        this.loanAmount = loanAmount;
+        this.annualIncome = annualIncome;
+        this.purpose = purpose;
+        this.probabilityOfDefault = prediction.probabilityOfDefault();
+        this.decision = prediction.decision();
+        this.suggestedInterestRate = prediction.suggestedInterestRate();
+        this.expectedLoss = prediction.expectedLoss();
         this.featuresJson = featuresJson;
         this.explanationJson = explanationJson;
         this.createdAt = LocalDateTime.now();
@@ -52,10 +57,13 @@ public class LoanApplication {
 
     public Long getId() { return id; }
     public String getApplicantName() { return applicantName; }
-    public Double getCreditLimit() { return creditLimit; }
-    public Integer getAge() { return age; }
+    public Double getLoanAmount() { return loanAmount; }
+    public Double getAnnualIncome() { return annualIncome; }
+    public String getPurpose() { return purpose; }
     public Double getProbabilityOfDefault() { return probabilityOfDefault; }
     public String getDecision() { return decision; }
+    public Double getSuggestedInterestRate() { return suggestedInterestRate; }
+    public Double getExpectedLoss() { return expectedLoss; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public String getFeaturesJson() { return featuresJson; }
     public String getExplanationJson() { return explanationJson; }

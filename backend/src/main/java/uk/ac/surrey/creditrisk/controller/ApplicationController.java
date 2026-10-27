@@ -43,15 +43,14 @@ public class ApplicationController {
     public Prediction score(@Valid @RequestBody ApplicationRequest request) throws JsonProcessingException {
         Prediction prediction = modelClient.predict(request.features());
 
-        Double creditLimit = request.features().get("LIMIT_BAL");
-        Double age = request.features().get("AGE");
+        Map<String, Object> features = request.features();
         repository.save(new LoanApplication(
                 request.applicantName(),
-                creditLimit,
-                age == null ? null : age.intValue(),
-                prediction.probabilityOfDefault(),
-                prediction.decision(),
-                objectMapper.writeValueAsString(request.features()),
+                asDouble(features.get("loan_amnt")),
+                asDouble(features.get("annual_inc")),
+                String.valueOf(features.get("purpose")),
+                prediction,
+                objectMapper.writeValueAsString(features),
                 objectMapper.writeValueAsString(prediction.topFactors())));
 
         return prediction;
@@ -63,10 +62,21 @@ public class ApplicationController {
         return repository.findAllByOrderByCreatedAtDesc();
     }
 
-    /** Model evaluation results (accuracy, AUC, fairness), passed through from Python. */
+    /** Allowed values for the drop-down fields, passed through from Python. */
+    @GetMapping("/options")
+    public Map<?, ?> options() {
+        return modelClient.options();
+    }
+
+    /** Model evaluation results (accuracy, profit, pricing), passed through from Python. */
     @GetMapping("/model-metrics")
     public Map<?, ?> metrics() {
         return modelClient.metrics();
+    }
+
+    /** JSON numbers arrive as Integer or Double; null if missing or not a number. */
+    private static Double asDouble(Object value) {
+        return value instanceof Number number ? number.doubleValue() : null;
     }
 
     /** The Python service rejected the input (e.g. a missing or out-of-range field). */

@@ -39,17 +39,20 @@ class ApplicationControllerTest {
 
     @Test
     void scoresAndSavesAnApplication() throws Exception {
-        when(modelClient.predict(anyMap())).thenReturn(new Prediction(0.12, "APPROVE",
-                List.of(new Prediction.Factor("PAY_0", "Repayment status (latest month)", -1, -0.4))));
+        when(modelClient.predict(anyMap())).thenReturn(new Prediction(0.12, "APPROVE", 840.0, 6.5, 8.5,
+                List.of(new Prediction.Factor("annual_inc", "Annual income", "90000", -0.4))));
 
         mockMvc.perform(post("/api/applications")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"applicantName\": \"Alice\", \"features\": {\"LIMIT_BAL\": 50000, \"AGE\": 30}}"))
+                        .content("{\"applicantName\": \"Alice\", \"features\": {\"loan_amnt\": 10000, \"annual_inc\": 90000, \"purpose\": \"car\"}}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.decision").value("APPROVE"))
-                .andExpect(jsonPath("$.probability_of_default").value(0.12));
+                .andExpect(jsonPath("$.probability_of_default").value(0.12))
+                .andExpect(jsonPath("$.suggested_interest_rate").value(8.5));
 
         assertThat(repository.findAll()).hasSize(1);
+        assertThat(repository.findAll().get(0).getLoanAmount()).isEqualTo(10000.0);
+        assertThat(repository.findAll().get(0).getPurpose()).isEqualTo("car");
 
         mockMvc.perform(get("/api/applications"))
                 .andExpect(status().isOk())
@@ -60,7 +63,7 @@ class ApplicationControllerTest {
     void rejectsApplicationWithoutName() throws Exception {
         mockMvc.perform(post("/api/applications")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"applicantName\": \"\", \"features\": {\"AGE\": 30}}"))
+                        .content("{\"applicantName\": \"\", \"features\": {\"loan_amnt\": 10000}}"))
                 .andExpect(status().isBadRequest());
     }
 }

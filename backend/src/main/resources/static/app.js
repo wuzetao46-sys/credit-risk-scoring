@@ -1,20 +1,17 @@
 // Front end for the credit risk platform. Talks only to the Spring Boot API (/api/...).
 
-const MONTHS = 6;
-const PAY_STATUS_FIELDS = ["PAY_0", "PAY_2", "PAY_3", "PAY_4", "PAY_5", "PAY_6"]; // dataset has no PAY_1
+const TEXT_FIELDS = ["applicantName", "purpose", "verification_status", "home_ownership", "addr_state"];
 
 const EXAMPLES = {
-    good: {
-        applicantName: "Example reliable payer", LIMIT_BAL: 200000, AGE: 35, EDUCATION: 1, MARRIAGE: 2,
-        pay: [-1, -1, -1, -1, -1, -1],
-        bill: [5000, 4000, 3000, 3000, 2000, 2000],
-        paid: [5000, 4000, 3000, 3000, 2000, 2000],
+    low: {
+        applicantName: "Example low-risk borrower", loan_amnt: 8000, term_months: 36, purpose: "credit_card",
+        annual_inc: 120000, emp_length: 10, verification_status: "verified", home_ownership: "MORTGAGE",
+        addr_state: "CA", dti: 5, revol_util: 10, delinq_2yrs: 0, total_acc: 30, longest_credit_length: 20,
     },
-    late: {
-        applicantName: "Example late payer", LIMIT_BAL: 20000, AGE: 24, EDUCATION: 2, MARRIAGE: 2,
-        pay: [3, 2, 2, 2, 2, 2],
-        bill: [19000, 18500, 18000, 17000, 16500, 16000],
-        paid: [0, 0, 0, 500, 500, 500],
+    high: {
+        applicantName: "Example high-risk borrower", loan_amnt: 30000, term_months: 60, purpose: "small_business",
+        annual_inc: 25000, emp_length: 0, verification_status: "verified", home_ownership: "RENT",
+        addr_state: "FL", dti: 30, revol_util: 95, delinq_2yrs: 3, total_acc: 5, longest_credit_length: 3,
     },
 };
 
@@ -25,66 +22,56 @@ const DECISION_TEXT = {
 };
 
 const form = document.getElementById("application-form");
+const usd = (x) => "$" + Math.round(x).toLocaleString();
+const pct = (x) => (x * 100).toFixed(1) + "%";
+const pretty = (text) => text.replaceAll("_", " ").replace(/^\w/, (c) => c.toUpperCase());
 
-// Build the 6-month table: one row each for repayment status, bill amount and amount paid.
-function buildMonthlyTable() {
-    const table = document.getElementById("monthly-table");
-    let html = "<tr><th></th>";
-    for (let m = 1; m <= MONTHS; m++) html += `<th>Month ${m}</th>`;
-    html += "</tr>";
-
-    const rows = [
-        ["Repayment status", (i) => PAY_STATUS_FIELDS[i], 'min="-2" max="9"'],
-        ["Bill amount", (i) => `BILL_AMT${i + 1}`, ""],
-        ["Amount paid", (i) => `PAY_AMT${i + 1}`, 'min="0"'],
-    ];
-    for (const [title, fieldName, limits] of rows) {
-        html += `<tr><th>${title}</th>`;
-        for (let i = 0; i < MONTHS; i++) {
-            html += `<td><input name="${fieldName(i)}" type="number" ${limits} required></td>`;
-        }
-        html += "</tr>";
-    }
-    table.innerHTML = html;
+// Fill the drop-downs (purpose, state, ...) with the values the model knows.
+async function loadOptions() {
+    const response = await fetch("/api/options");
+    if (!response.ok) return;
+    const options = await response.json();
+    document.querySelectorAll("[data-options]").forEach((select) => {
+        select.innerHTML = options[select.dataset.options]
+            .map((value) => `<option value="${value}">${pretty(value)}</option>`).join("");
+    });
 }
 
 function fillExample(example) {
-    for (const key of ["applicantName", "LIMIT_BAL", "AGE", "EDUCATION", "MARRIAGE"]) {
-        form.elements[key].value = example[key];
-    }
-    for (let i = 0; i < MONTHS; i++) {
-        form.elements[PAY_STATUS_FIELDS[i]].value = example.pay[i];
-        form.elements[`BILL_AMT${i + 1}`].value = example.bill[i];
-        form.elements[`PAY_AMT${i + 1}`].value = example.paid[i];
+    for (const [key, value] of Object.entries(example)) {
+        form.elements[key].value = value;
     }
 }
 
-// Turn the form into {applicantName, features: {LIMIT_BAL: ..., ...}}
+// Turn the form into {applicantName, features: {loan_amnt: 8000, purpose: "car", ...}}
 function readForm() {
     const features = {};
     for (const element of form.elements) {
-        if (element.name && element.name !== "applicantName") {
-            features[element.name] = Number(element.value);
-        }
+        if (!element.name || element.name === "applicantName") continue;
+        features[element.name] = TEXT_FIELDS.includes(element.name) ? element.value : Number(element.value);
     }
     return { applicantName: form.elements.applicantName.value, features };
 }
 
-function showResult(prediction) {
+function showResult(p) {
     document.getElementById("result").hidden = false;
-    document.getElementById("probability").textContent =
-        (prediction.probability_of_default * 100).toFixed(1) + "%";
+    document.getElementById("probability").textContent = pct(p.probability_of_default);
+    document.getElementById("expected-loss").textContent = usd(p.expected_loss);
+    document.getElementById("suggested-rate").textContent =
+        p.suggested_interest_rate === null ? "n/a (declined)" : p.suggested_interest_rate.toFixed(2) + "%";
+    document.getElementById("rate-note").textContent =
+        `Break-even rate ${p.break_even_rate.toFixed(2)}%: below it the lender expects to lose money on this loan.`;
 
     const badge = document.getElementById("decision");
-    badge.textContent = DECISION_TEXT[prediction.decision];
-    badge.className = "badge " + prediction.decision.toLowerCase();
+    badge.textContent = DECISION_TEXT[p.decision];
+    badge.className = "badge " + p.decision.toLowerCase();
 
-    const maxImpact = Math.max(...prediction.top_factors.map((f) => Math.abs(f.impact)));
-    document.getElementById("factors").innerHTML = prediction.top_factors.map((f) => {
+    const maxImpact = Math.max(...p.top_factors.map((f) => Math.abs(f.impact)));
+    document.getElementById("factors").innerHTML = p.top_factors.map((f) => {
         const width = (Math.abs(f.impact) / maxImpact) * 100;
         const direction = f.impact > 0 ? "up" : "down";
         return `<div class="factor">
-            <span class="factor-label">${f.label} = ${f.value}</span>
+            <span class="factor-label">${f.label} = ${escapeHtml(pretty(f.value))}</span>
             <span class="bar-track"><span class="bar ${direction}" style="width:${width}%"></span></span>
             <span class="factor-impact">${f.impact > 0 ? "+" : ""}${f.impact.toFixed(2)}</span>
         </div>`;
@@ -98,11 +85,17 @@ async function loadHistory() {
         <tr>
             <td>${new Date(a.createdAt).toLocaleString()}</td>
             <td>${escapeHtml(a.applicantName)}</td>
-            <td>${a.creditLimit}</td>
-            <td>${a.age}</td>
-            <td>${(a.probabilityOfDefault * 100).toFixed(1)}%</td>
+            <td>${usd(a.loanAmount)}</td>
+            <td>${pretty(a.purpose)}</td>
+            <td>${pct(a.probabilityOfDefault)}</td>
             <td><span class="badge ${a.decision.toLowerCase()}">${DECISION_TEXT[a.decision]}</span></td>
+            <td>${a.suggestedInterestRate === null ? "-" : a.suggestedInterestRate.toFixed(2) + "%"}</td>
         </tr>`).join("");
+}
+
+function table(headers, rows) {
+    return `<table><tr>${headers.map((h) => `<th>${h}</th>`).join("")}</tr>
+        ${rows.map((r) => `<tr>${r.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</table>`;
 }
 
 async function loadMetrics() {
@@ -113,19 +106,30 @@ async function loadMetrics() {
         return;
     }
     const m = await response.json();
-    const row = (name, r) =>
-        `<tr><td>${name}</td><td>${r.auc}</td><td>${r.accuracy}</td><td>${r.precision}</td><td>${r.recall}</td><td>${r.f1}</td></tr>`;
-    const fair = m.fairness_by_sex;
+    const modelRow = (name, r) => [name, r.auc, r.accuracy, r.precision, r.recall, r.f1];
+
     box.innerHTML = `
-        <p>Test set: ${m.test_rows} of ${m.dataset_rows} customers.</p>
-        <table>
-            <tr><th>Model</th><th>AUC</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1</th></tr>
-            ${row("Logistic Regression (baseline)", m.logistic_regression)}
-            ${row("XGBoost", m.xgboost)}
-        </table>
-        <p>Fairness check (sex is not a model input): approval rate male ${(fair.male.approval_rate * 100).toFixed(1)}%,
-           female ${(fair.female.approval_rate * 100).toFixed(1)}%,
-           difference ${(fair.approval_rate_difference * 100).toFixed(1)} percentage points.</p>`;
+        <p>Test set: ${m.test_rows.toLocaleString()} of ${m.dataset_rows.toLocaleString()} loans.</p>
+        <h3>Prediction quality</h3>
+        ${table(["Model", "AUC", "Accuracy", "Precision", "Recall", "F1"], [
+            modelRow("Logistic Regression (baseline)", m.logistic_regression),
+            modelRow("XGBoost, threshold 0.50", m.xgboost),
+            modelRow(`XGBoost, threshold ${m.approval_threshold}`, m.xgboost_at_approval_threshold),
+        ])}
+
+        <h3>Does the model make the lender more money?</h3>
+        <p class="hint">Profit on the test loans, assuming the lender loses ${pct(m.assumptions.loss_given_default)}
+            of a defaulted loan.</p>
+        ${table(["Strategy", "Approval rate", "Default rate of approved", "Total profit"],
+            m.profit_comparison.map((r) => [r.strategy, pct(r.approval_rate), pct(r.default_rate_of_approved), usd(r.total_profit_usd)]))}
+
+        <h3>Pricing check: is the interest rate right for the risk?</h3>
+        ${table(["Lending Club rate", "Loans", "Actual default rate", "Model's average PD", "Priced below break-even"],
+            m.pricing_check.map((r) => [r.interest_rate_band, r.loans.toLocaleString(), pct(r.actual_default_rate), pct(r.mean_predicted_pd), pct(r.share_underpriced)]))}
+
+        <h3>Who gets approved? (income quartiles)</h3>
+        ${table(["Income band", "Loans", "Actual default rate", "Approval rate"],
+            m.group_analysis.income_band.map((r) => [r.group, r.loans.toLocaleString(), pct(r.actual_default_rate), pct(r.approval_rate)]))}`;
 }
 
 function escapeHtml(text) {
@@ -142,7 +146,7 @@ form.addEventListener("submit", async (event) => {
         body: JSON.stringify(readForm()),
     });
     if (!response.ok) {
-        alert("Could not score the applicant: " + (await response.text()));
+        alert("Could not score the application: " + (await response.text()));
         return;
     }
     showResult(await response.json());
@@ -152,6 +156,6 @@ form.addEventListener("submit", async (event) => {
 document.querySelectorAll("[data-example]").forEach((button) =>
     button.addEventListener("click", () => fillExample(EXAMPLES[button.dataset.example])));
 
-buildMonthlyTable();
+loadOptions();
 loadMetrics();
 loadHistory();

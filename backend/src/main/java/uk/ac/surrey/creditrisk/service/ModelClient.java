@@ -20,13 +20,21 @@ public class ModelClient {
         this.restClient = RestClient.create(mlServiceUrl);
     }
 
-    public Prediction predict(Map<String, Double> features) {
+    public Prediction predict(Map<String, Object> features) {
         return restClient.post()
                 .uri("/predict")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(features)
                 .retrieve()
                 .body(Prediction.class);
+    }
+
+    /** Allowed values for the drop-down fields (purpose, state, ...). */
+    public Map<?, ?> options() {
+        return restClient.get()
+                .uri("/options")
+                .retrieve()
+                .body(Map.class);
     }
 
     public Map<?, ?> metrics() {
