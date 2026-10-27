@@ -42,6 +42,8 @@ Fairness: approval rate 87.4% (male) vs 88.3% (female), a difference of 1.0 perc
 
 ## How to run
 
+中文使用与调试指南：[docs/GUIDE_zh.md](docs/GUIDE_zh.md)
+
 You need **Python 3.10+**, **Java 17+** and **Maven** (IntelliJ IDEA includes Maven).
 
 ### 1. Model service (terminal 1)
